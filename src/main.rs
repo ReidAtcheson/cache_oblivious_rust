@@ -3,7 +3,7 @@ use std::time::{Instant};
 use ndarray::{Zip,Array2,ArrayView2,ArrayViewMut2,s};
 
 //Computes C+=A*B
-fn gemm_reference(a : &ArrayView2<f64>,b : &ArrayView2<f64>,c : &mut ArrayViewMut2<f64>) -> () {
+fn gemm_reference(a : ArrayView2<f64>,b : ArrayView2<f64>,mut c : ArrayViewMut2<f64>) -> () {
     assert_eq!(a.shape()[1],b.shape()[0]);
     assert_eq!(a.shape()[0],c.shape()[0]);
     assert_eq!(b.shape()[1],c.shape()[1]);
@@ -23,7 +23,7 @@ fn gemm_reference(a : &ArrayView2<f64>,b : &ArrayView2<f64>,c : &mut ArrayViewMu
 }
 
 
-fn gemm_optimized(a : &ArrayView2<f64>,b : &ArrayView2<f64>,c : &mut ArrayViewMut2<f64>) -> () {
+fn gemm_optimized(a : ArrayView2<f64>,b : ArrayView2<f64>,mut c : ArrayViewMut2<f64>) -> () {
     assert_eq!(a.shape()[1],b.shape()[0]);
     assert_eq!(a.shape()[0],c.shape()[0]);
     assert_eq!(b.shape()[1],c.shape()[1]);
@@ -74,7 +74,7 @@ fn main() {
         let mut times_ref = Vec::<f64>::new();
         for _ in 0..nruns{
             let now = Instant::now();
-            gemm_reference(&a.view(),&b.view(),&mut c1.view_mut());
+            gemm_reference(a.view(),b.view(),c1.view_mut());
             times_ref.push(now.elapsed().as_secs_f64());
         }
         times_ref.sort_by(|x,y|x.partial_cmp(y).unwrap());
@@ -85,7 +85,7 @@ fn main() {
         let mut times_opt = Vec::<f64>::new();
         for _ in 0..nruns{
             let now = Instant::now();
-            gemm_optimized(&a.view(),&b.view(),&mut c2.view_mut());
+            gemm_optimized(a.view(),b.view(),c2.view_mut());
             times_opt.push(now.elapsed().as_secs_f64());
         }
         times_opt.sort_by(|x,y|x.partial_cmp(y).unwrap());
