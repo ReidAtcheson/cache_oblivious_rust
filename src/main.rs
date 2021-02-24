@@ -1,6 +1,6 @@
 use std::env;
 use std::time::{Instant};
-use ndarray::{Array2,ArrayView2,ArrayViewMut2,s};
+use ndarray::{Zip,Array2,ArrayView2,ArrayViewMut2,s};
 
 //Computes C+=A*B
 fn gemm_reference(a : &ArrayView2<f64>,b : &ArrayView2<f64>,c : &mut ArrayViewMut2<f64>) -> () {
@@ -8,7 +8,6 @@ fn gemm_reference(a : &ArrayView2<f64>,b : &ArrayView2<f64>,c : &mut ArrayViewMu
     assert_eq!(a.shape()[0],c.shape()[0]);
     assert_eq!(b.shape()[1],c.shape()[1]);
     let m=a.shape()[0];
-    let k=a.shape()[1];
     let n=b.shape()[1];
 
     for i in 0..m{
@@ -25,7 +24,23 @@ fn gemm_reference(a : &ArrayView2<f64>,b : &ArrayView2<f64>,c : &mut ArrayViewMu
 
 
 fn gemm_optimized(a : &ArrayView2<f64>,b : &ArrayView2<f64>,c : &mut ArrayViewMut2<f64>) -> () {
-    gemm_reference(a,b,c);
+    assert_eq!(a.shape()[1],b.shape()[0]);
+    assert_eq!(a.shape()[0],c.shape()[0]);
+    assert_eq!(b.shape()[1],c.shape()[1]);
+    let m=a.shape()[0];
+    let p=a.shape()[1];
+    let n=b.shape()[1];
+
+    for i in 0..m{
+        //Get i-th row of c
+        let mut ci = c.slice_mut(s![i,..]);
+        for k in 0..p{
+            //Get k-th row of b
+            let bk = b.slice(s![k,..]);
+            let aik=a[[i,k]];
+            Zip::from(&mut ci).and(&bk).apply(|x,&y|{*x=*x+y*aik});
+        }
+    }
 }
 
 
@@ -103,7 +118,7 @@ fn main() {
         let max=*times_opt.last().unwrap();
         let avg=times_opt.iter().fold(0.0,|acc,x|acc+x)/(times_opt.len() as f64);
         let std=(times_opt.iter().map(|x|(avg-x)*(avg-x)).fold(0.0,|acc,x|acc+x)/(times_opt.len() as f64)).sqrt();
-        print!("Reference:    min = {},   max = {},  avg = {},  std = {}\n",min,max,avg,std);
+        print!("Optimized:    min = {},   max = {},  avg = {},  std = {}\n",min,max,avg,std);
     }
 
 
