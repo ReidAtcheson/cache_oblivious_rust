@@ -1,29 +1,11 @@
 use std::env;
 use std::time::{Instant};
-use ndarray::{Zip,Array2,ArrayView2,ArrayViewMut2,s};
+use ndarray::{Axis,Zip,Array2,ArrayView2,ArrayViewMut2,s};
 
 //Computes C+=A*B
 fn gemm_reference(a : &ArrayView2<f64>,b : &ArrayView2<f64>,c : &mut ArrayViewMut2<f64>) -> () {
-    assert_eq!(a.shape()[1],b.shape()[0]);
-    assert_eq!(a.shape()[0],c.shape()[0]);
-    assert_eq!(b.shape()[1],c.shape()[1]);
-    let m=a.shape()[0];
-    let n=b.shape()[1];
-
-    for i in 0..m{
-        for j in 0..n{
-            //Get i-th row of a
-            let ai = a.slice(s![i,..]);
-            //Get j-th column of b
-            let bj = b.slice(s![..,j]);
-            //c(i,j) is dot product of ai,bj
-            c[[i,j]] += ai.iter().zip(bj.iter()).map(|(&x,&y)|{x*y}).fold(0.0,|acc,x|{acc+x});
-        }
-    }
-}
 
 
-fn gemm_optimized(a : &ArrayView2<f64>,b : &ArrayView2<f64>,c : &mut ArrayViewMut2<f64>) -> () {
     assert_eq!(a.shape()[1],b.shape()[0]);
     assert_eq!(a.shape()[0],c.shape()[0]);
     assert_eq!(b.shape()[1],c.shape()[1]);
@@ -40,6 +22,31 @@ fn gemm_optimized(a : &ArrayView2<f64>,b : &ArrayView2<f64>,c : &mut ArrayViewMu
             let aik=a[[i,k]];
             Zip::from(&mut ci).and(&bk).apply(|x,&y|{*x=*x+y*aik});
         }
+    }
+}
+
+
+fn gemm_optimized(a : &ArrayView2<f64>,b : &ArrayView2<f64>,c : &mut ArrayViewMut2<f64>) -> () {
+    const MAXSIZE : usize = 32;
+    assert_eq!(a.shape()[1],b.shape()[0]);
+    assert_eq!(a.shape()[0],c.shape()[0]);
+    assert_eq!(b.shape()[1],c.shape()[1]);
+    let m=a.shape()[0];
+    let p=a.shape()[1];
+    let n=b.shape()[1];
+    if m>MAXSIZE || n>MAXSIZE{
+        let m2=m/2;
+        let n2=n/2;
+        let (c11,c12,c21,c22) = {
+            let (c1,c2)   = c.split_at(Axis(0),m2);
+            let (c11,c12) = c1.split_at(Axis(1),n2);
+            let (c21,c22) = c2.split_at(Axis(1),n2);
+            (c11,c12,c21,c22)
+        };
+        //gemm_reference(a,b,c);
+    }
+    else{
+        gemm_reference(a,b,c);
     }
 }
 
