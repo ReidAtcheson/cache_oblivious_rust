@@ -32,7 +32,7 @@ fn gemm_optimized(a : &ArrayView2<f64>,b : &ArrayView2<f64>,c : &mut ArrayViewMu
 fn main() {
     let args: Vec<String> = env::args().collect();
     let m=args[1].parse::<usize>().unwrap();
-    let n=100 as usize;
+    let n=m as usize;
     let nruns=100;
     let mut c1 = Array2::<f64>::zeros((m,n));
     let mut c2 = Array2::<f64>::zeros((m,n));
@@ -62,6 +62,7 @@ fn main() {
             gemm_reference(&a.view(),&b.view(),&mut c1.view_mut());
             times_ref.push(now.elapsed().as_secs_f64());
         }
+        times_ref.sort_by(|x,y|x.partial_cmp(y).unwrap());
         times_ref
     };
 
@@ -72,6 +73,7 @@ fn main() {
             gemm_optimized(&a.view(),&b.view(),&mut c2.view_mut());
             times_opt.push(now.elapsed().as_secs_f64());
         }
+        times_opt.sort_by(|x,y|x.partial_cmp(y).unwrap());
         times_opt
     };
 
@@ -87,4 +89,26 @@ fn main() {
     }
     //Print out the result for inspection
     print!("Maximum relative error: {}\n",max_relerr);
+    //Print out timing statistics for reference run
+    {
+        let min=times_ref[0];
+        let max=*times_ref.last().unwrap();
+        let avg=times_ref.iter().fold(0.0,|acc,x|acc+x)/(times_ref.len() as f64);
+        let std=(times_ref.iter().map(|x|(avg-x)*(avg-x)).fold(0.0,|acc,x|acc+x)/(times_ref.len() as f64)).sqrt();
+        print!("Reference:    min = {},   max = {},  avg = {},  std = {}\n",min,max,avg,std);
+    }
+    //Print out timing statistics for optimized run
+    {
+        let min=times_opt[0];
+        let max=*times_opt.last().unwrap();
+        let avg=times_opt.iter().fold(0.0,|acc,x|acc+x)/(times_opt.len() as f64);
+        let std=(times_opt.iter().map(|x|(avg-x)*(avg-x)).fold(0.0,|acc,x|acc+x)/(times_opt.len() as f64)).sqrt();
+        print!("Reference:    min = {},   max = {},  avg = {},  std = {}\n",min,max,avg,std);
+    }
+
+
+
+
+
+
 }
