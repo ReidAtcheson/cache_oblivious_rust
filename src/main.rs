@@ -11,61 +11,16 @@ fn gemm_base(a : ArrayView2<f64>,b : ArrayView2<f64>,mut c : ArrayViewMut2<f64>)
     assert_eq!(a.shape()[1],b.shape()[0]);
     assert_eq!(a.shape()[0],c.shape()[0]);
     assert_eq!(b.shape()[1],c.shape()[1]);
-    let m=a.shape()[0];
-    let p=a.shape()[1];
-    let n=b.shape()[1];
 
 
-    for (mut ci,ai) in c.genrows_mut().into_iterator().zip(a.genrows().into_iterator()){
-        for (bk,aik) in b.genrows().into_iterator().zip(ai.iter()){
-            for (cij,bkj) in ci.iter_mut().zip(bk.iter()){
-                *cij+=(*aik)*(*bkj);
-            }
+    for (mut ci,ai) in c.genrows_mut().into_iter().zip(a.genrows().into_iter()){
+        for (bk,aik) in b.genrows().into_iter().zip(ai.iter()){
+            Zip::from(&mut ci).and(&bk).apply({
+                |x,y|{
+                    *x += (*y)*aik;
+                }
+            });
         }
-    }
-
-    /*
-    for i in 0..m{
-        //Get i-th row of c
-        let mut ci = c.slice_mut(s![i,..]);
-        for k in 0..p{
-            //Get k-th row of b
-            let bk = b.slice(s![k,..]);
-            let aik=a[[i,k]];
-            Zip::from(&mut ci).and(&bk).apply(|x,&y|{*x=*x+y*aik});
-        }
-    }
-    */
-}
-
-
-fn gemm_reference(a : ArrayView2<f64>,b : ArrayView2<f64>,mut c : ArrayViewMut2<f64>) -> () {
-    const MAXSIZE : usize = 256;
-    assert_eq!(a.shape()[1],b.shape()[0]);
-    assert_eq!(a.shape()[0],c.shape()[0]);
-    assert_eq!(b.shape()[1],c.shape()[1]);
-    let m=a.shape()[0];
-    let p=a.shape()[1];
-    let n=b.shape()[1];
-    if m>MAXSIZE || n>MAXSIZE{
-        let m2=m/2;
-        let n2=n/2;
-        let p2=p/2;
-        //Update c11 block
-        gemm_reference(a.slice(s![0..m2,0..p2]),b.slice(s![0..p2,0..n2]),c.slice_mut(s![0..m2,0..n2]));
-        gemm_reference(a.slice(s![0..m2,p2..p]),b.slice(s![p2..p,0..n2]),c.slice_mut(s![0..m2,0..n2]));
-        //Update c12 block
-        gemm_reference(a.slice(s![0..m2,0..p2]),b.slice(s![0..p2,n2..n]),c.slice_mut(s![0..m2,n2..n]));
-        gemm_reference(a.slice(s![0..m2,p2..p]),b.slice(s![p2..p,n2..n]),c.slice_mut(s![0..m2,n2..n]));
-        //Update c21 block
-        gemm_reference(a.slice(s![m2..m,0..p2]),b.slice(s![0..p2,0..n2]),c.slice_mut(s![m2..m,0..n2]));
-        gemm_reference(a.slice(s![m2..m,p2..p]),b.slice(s![p2..p,0..n2]),c.slice_mut(s![m2..m,0..n2]));
-        //Update c22 block
-        gemm_reference(a.slice(s![m2..m,0..p2]),b.slice(s![0..p2,n2..n]),c.slice_mut(s![m2..m,n2..n]));
-        gemm_reference(a.slice(s![m2..m,p2..p]),b.slice(s![p2..p,n2..n]),c.slice_mut(s![m2..m,n2..n]));
-    }
-    else{
-        gemm_base(a,b,c);
     }
 }
 
