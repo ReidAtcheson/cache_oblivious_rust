@@ -1,9 +1,9 @@
 use std::env;
 use std::time::{Instant};
-use ndarray::{Axis,Zip,Array2,ArrayView2,ArrayViewMut2,s};
+use ndarray::{Zip,Array2,ArrayView2,ArrayViewMut2,s};
 
 //Computes C+=A*B
-fn gemm_reference(a : &ArrayView2<f64>,b : &ArrayView2<f64>,c : &mut ArrayViewMut2<f64>) -> () {
+fn gemm_reference(a : ArrayView2<f64>,b : ArrayView2<f64>,mut c : ArrayViewMut2<f64>) -> () {
 
 
     assert_eq!(a.shape()[1],b.shape()[0]);
@@ -26,8 +26,8 @@ fn gemm_reference(a : &ArrayView2<f64>,b : &ArrayView2<f64>,c : &mut ArrayViewMu
 }
 
 
-fn gemm_optimized(a : &ArrayView2<f64>,b : &ArrayView2<f64>,c : &mut ArrayViewMut2<f64>) -> () {
-    const MAXSIZE : usize = 32;
+fn gemm_optimized(a : ArrayView2<f64>,b : ArrayView2<f64>,mut c : ArrayViewMut2<f64>) -> () {
+    const MAXSIZE : usize = 256;
     assert_eq!(a.shape()[1],b.shape()[0]);
     assert_eq!(a.shape()[0],c.shape()[0]);
     assert_eq!(b.shape()[1],c.shape()[1]);
@@ -37,13 +37,19 @@ fn gemm_optimized(a : &ArrayView2<f64>,b : &ArrayView2<f64>,c : &mut ArrayViewMu
     if m>MAXSIZE || n>MAXSIZE{
         let m2=m/2;
         let n2=n/2;
-        let (c11,c12,c21,c22) = {
-            let (c1,c2)   = c.split_at(Axis(0),m2);
-            let (c11,c12) = c1.split_at(Axis(1),n2);
-            let (c21,c22) = c2.split_at(Axis(1),n2);
-            (c11,c12,c21,c22)
-        };
-        //gemm_reference(a,b,c);
+        let p2=p/2;
+        //Update c11 block
+        gemm_optimized(a.slice(s![0..m2,0..p2]),b.slice(s![0..p2,0..n2]),c.slice_mut(s![0..m2,0..n2]));
+        gemm_optimized(a.slice(s![0..m2,p2..p]),b.slice(s![p2..p,0..n2]),c.slice_mut(s![0..m2,0..n2]));
+        //Update c12 block
+        gemm_optimized(a.slice(s![0..m2,0..p2]),b.slice(s![0..p2,n2..n]),c.slice_mut(s![0..m2,n2..n]));
+        gemm_optimized(a.slice(s![0..m2,p2..p]),b.slice(s![p2..p,n2..n]),c.slice_mut(s![0..m2,n2..n]));
+        //Update c21 block
+        gemm_optimized(a.slice(s![m2..m,0..p2]),b.slice(s![0..p2,0..n2]),c.slice_mut(s![m2..m,0..n2]));
+        gemm_optimized(a.slice(s![m2..m,p2..p]),b.slice(s![p2..p,0..n2]),c.slice_mut(s![m2..m,0..n2]));
+        //Update c22 block
+        gemm_optimized(a.slice(s![m2..m,0..p2]),b.slice(s![0..p2,n2..n]),c.slice_mut(s![m2..m,n2..n]));
+        gemm_optimized(a.slice(s![m2..m,p2..p]),b.slice(s![p2..p,n2..n]),c.slice_mut(s![m2..m,n2..n]));
     }
     else{
         gemm_reference(a,b,c);
@@ -81,7 +87,7 @@ fn main() {
         let mut times_ref = Vec::<f64>::new();
         for _ in 0..nruns{
             let now = Instant::now();
-            gemm_reference(&a.view(),&b.view(),&mut c1.view_mut());
+            gemm_reference(a.view(),b.view(),c1.view_mut());
             times_ref.push(now.elapsed().as_secs_f64());
         }
         times_ref.sort_by(|x,y|x.partial_cmp(y).unwrap());
@@ -92,7 +98,7 @@ fn main() {
         let mut times_opt = Vec::<f64>::new();
         for _ in 0..nruns{
             let now = Instant::now();
-            gemm_optimized(&a.view(),&b.view(),&mut c2.view_mut());
+            gemm_optimized(a.view(),b.view(),c2.view_mut());
             times_opt.push(now.elapsed().as_secs_f64());
         }
         times_opt.sort_by(|x,y|x.partial_cmp(y).unwrap());
