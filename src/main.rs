@@ -9,7 +9,7 @@ use blas::dgemm;
 //Computes C+=A*B
 fn gemm_base(a : ArrayView2<f64>,b : ArrayView2<f64>,mut c : ArrayViewMut2<f64>) -> () {
     const BI : usize = 8;
-    const BK : usize = 8;
+    const BK : usize = 16;
 
     assert_eq!(a.shape()[1],b.shape()[0]);
     assert_eq!(a.shape()[0],c.shape()[0]);
@@ -25,14 +25,13 @@ fn gemm_base(a : ArrayView2<f64>,b : ArrayView2<f64>,mut c : ArrayViewMut2<f64>)
             let iend=std::cmp::min(m,ibeg+BI);
             let kend=std::cmp::min(p,kbeg+BK);
             for i in ibeg..iend{
-                for k in kbeg..kend{
                 //Get i-th row of c
-                let mut ci = c.slice_mut(s![i,0..n]);
+                let mut ci = c.slice_mut(s![i,..]);
+                for k in kbeg..kend{
                     //Get k-th row of b
-                    let bk = b.slice(s![k,0..n]);
+                    let bk = b.slice(s![k,..]);
                     let aik=a[[i,k]];
-                    //Zip::from(&mut ci).and(&bk).apply(|x,&y|{*x=*x+y*aik;});
-                    Zip::from(&mut ci).and(&bk).apply(|x,&y|{*x=y.mul_add(aik,*x);});
+                    Zip::from(&mut ci).and(&bk).apply(|x,&y|{*x=*x+y*aik;});
                 }
             }
         }
