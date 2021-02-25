@@ -6,9 +6,9 @@ use std::time::{Instant};
 use ndarray::{Zip,Array2,ArrayView2,ArrayViewMut2,s};
 use blas::dgemm;
 
-const BI : usize = 8;
-const BJ : usize = 32;
-const BK : usize = 8;
+const BI : usize = 16;
+const BJ : usize = 64;
+const BK : usize = 16;
 
 
 
@@ -60,13 +60,10 @@ fn gemm_base(a : ArrayView2<f64>,b : ArrayView2<f64>,mut c : ArrayViewMut2<f64>)
                     }
 
 
-                    for i in 0..BI{
-                        let mut sc = cb.slice_mut(s![i,..]);
-                        for k in 0..BK{
-                            let sb = bb.slice(s![k,..]);
-                            let aik = ab[[i,k]];
-                            for (x,y) in sc.iter_mut().zip(sb.iter()){
-                                *x += aik * (*y);
+                    for (mut ci,ai) in cb.genrows_mut().into_iter().zip(ab.genrows().into_iter()){
+                        for (aik,bk) in ai.iter().zip(bb.genrows().into_iter()){
+                            for (cij,bkj) in ci.iter_mut().zip(bk.iter()){
+                                *cij += (*aik)*(*bkj);
                             }
                         }
                     }
