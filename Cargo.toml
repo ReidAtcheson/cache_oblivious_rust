@@ -9,3 +9,5 @@ edition = "2018"
 [dependencies]
 ndarray = "0.14.0"
 rayon = "1.5.0"
+blas = "0.21.0"
+openblas-src = "0.10.2"

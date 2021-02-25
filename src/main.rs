@@ -1,7 +1,11 @@
+extern crate blas;
+extern crate openblas_src;
+
 use std::env;
 use std::time::{Instant};
 use ndarray::{Zip,Array2,ArrayView2,ArrayViewMut2,s};
 use rayon::join;
+use blas::dgemm;
 
 //Computes C+=A*B
 fn gemm_base(a : ArrayView2<f64>,b : ArrayView2<f64>,mut c : ArrayViewMut2<f64>) -> () {
@@ -135,7 +139,10 @@ fn main() {
         let mut times_ref = Vec::<f64>::new();
         for _ in 0..nruns{
             let now = Instant::now();
-            gemm_reference(a.view(),b.view(),c1.view_mut());
+            unsafe{
+                dgemm(b'T',b'T',m as i32,m as i32,m as i32,1.0,
+                      b.as_slice_memory_order().unwrap(),m as i32,a.as_slice_memory_order().unwrap(),m as i32,1.0,c1.as_slice_memory_order_mut().unwrap(),m as i32);
+            }
             times_ref.push(now.elapsed().as_secs_f64());
         }
         times_ref.sort_by(|x,y|x.partial_cmp(y).unwrap());
