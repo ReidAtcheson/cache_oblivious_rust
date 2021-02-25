@@ -11,15 +11,13 @@ fn gemm_base(a : ArrayView2<f64>,b : ArrayView2<f64>,mut c : ArrayViewMut2<f64>)
     assert_eq!(a.shape()[1],b.shape()[0]);
     assert_eq!(a.shape()[0],c.shape()[0]);
     assert_eq!(b.shape()[1],c.shape()[1]);
-
-
     for (mut ci,ai) in c.genrows_mut().into_iter().zip(a.genrows().into_iter()){
         for (bk,aik) in b.genrows().into_iter().zip(ai.iter()){
-            Zip::from(&mut ci).and(&bk).apply({
+            Zip::from(&mut ci).and(&bk).apply(
                 |x,y|{
                     *x += (*y)*aik;
                 }
-            });
+            );
         }
     }
 }
