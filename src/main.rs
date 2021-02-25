@@ -4,7 +4,6 @@ extern crate openblas_src;
 use std::env;
 use std::time::{Instant};
 use ndarray::{Zip,Array2,ArrayView2,ArrayViewMut2,s};
-use rayon::join;
 use blas::dgemm;
 
 //Computes C+=A*B
@@ -16,6 +15,16 @@ fn gemm_base(a : ArrayView2<f64>,b : ArrayView2<f64>,mut c : ArrayViewMut2<f64>)
     let p=a.shape()[1];
     let n=b.shape()[1];
 
+
+    for (mut ci,ai) in c.genrows_mut().into_iterator().zip(a.genrows().into_iterator()){
+        for (bk,aik) in b.genrows().into_iterator().zip(ai.iter()){
+            for (cij,bkj) in ci.iter_mut().zip(bk.iter()){
+                *cij+=(*aik)*(*bkj);
+            }
+        }
+    }
+
+    /*
     for i in 0..m{
         //Get i-th row of c
         let mut ci = c.slice_mut(s![i,..]);
@@ -26,6 +35,7 @@ fn gemm_base(a : ArrayView2<f64>,b : ArrayView2<f64>,mut c : ArrayViewMut2<f64>)
             Zip::from(&mut ci).and(&bk).apply(|x,&y|{*x=*x+y*aik});
         }
     }
+    */
 }
 
 
