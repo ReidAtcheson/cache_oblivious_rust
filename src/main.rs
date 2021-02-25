@@ -6,10 +6,16 @@ use std::time::{Instant};
 use ndarray::{Zip,Array2,ArrayView2,ArrayViewMut2,s};
 use blas::dgemm;
 
+const BI : usize = 8;
+const BJ : usize = 32;
+const BK : usize = 8;
+
+
+
+
+
 //Computes C+=A*B
 fn gemm_base(a : ArrayView2<f64>,b : ArrayView2<f64>,mut c : ArrayViewMut2<f64>) -> () {
-    const BI : usize = 8;
-    const BK : usize = 16;
 
     assert_eq!(a.shape()[1],b.shape()[0]);
     assert_eq!(a.shape()[0],c.shape()[0]);
@@ -18,20 +24,70 @@ fn gemm_base(a : ArrayView2<f64>,b : ArrayView2<f64>,mut c : ArrayViewMut2<f64>)
     let p=a.shape()[1];
     let n=b.shape()[1];
 
+    let mut at = [0.0 ; BI*BK];
+    let mut bt = [0.0 ; BJ*BK];
+    let mut ct = [0.0 ; BI*BJ];
+
     for bi in (0..m).step_by(BI){
-        for bk in (0..p).step_by(BK){
-            let ibeg=bi;
-            let kbeg=bk;
-            let iend=std::cmp::min(m,ibeg+BI);
-            let kend=std::cmp::min(p,kbeg+BK);
-            for i in ibeg..iend{
-                //Get i-th row of c
-                let mut ci = c.slice_mut(s![i,..]);
-                for k in kbeg..kend{
-                    //Get k-th row of b
-                    let bk = b.slice(s![k,..]);
-                    let aik=a[[i,k]];
-                    Zip::from(&mut ci).and(&bk).apply(|x,&y|{*x=*x+y*aik;});
+        for bj in (0..n).step_by(BJ){
+            for bk in (0..p).step_by(BK){
+                let ibeg=bi;
+                let jbeg=bj;
+                let kbeg=bk;
+                let iend=std::cmp::min(m,ibeg+BI);
+                let jend=std::cmp::min(n,jbeg+BJ);
+                let kend=std::cmp::min(p,kbeg+BK);
+
+                if iend-ibeg==BI && jend-jbeg==BJ && kend-kbeg==BK{
+                    let av = a.slice(s![ibeg..iend,kbeg..kend]);
+                    let bv = b.slice(s![kbeg..kend,jbeg..jend]);
+                    let mut cv = c.slice_mut(s![ibeg..iend,jbeg..jend]);
+
+                    let mut ab = ArrayViewMut2::from_shape((BI,BK),&mut at).unwrap();
+                    let mut bb = ArrayViewMut2::from_shape((BK,BJ),&mut bt).unwrap();
+                    let mut cb = ArrayViewMut2::from_shape((BI,BJ),&mut ct).unwrap();
+
+                    for (x,y) in ab.iter_mut().zip(av.iter()){
+                        *x=*y;
+                    }
+                    for (x,y) in bb.iter_mut().zip(bv.iter()){
+                        *x=*y;
+                    }
+                    if bk==0{
+                        for (x,y) in cb.iter_mut().zip(cv.iter()){
+                            *x=*y;
+                        }
+                    }
+
+
+                    for i in 0..BI{
+                        let mut sc = cb.slice_mut(s![i,..]);
+                        for k in 0..BK{
+                            let sb = bb.slice(s![k,..]);
+                            let aik = ab[[i,k]];
+                            for (x,y) in sc.iter_mut().zip(sb.iter()){
+                                *x += aik * (*y);
+                            }
+                        }
+                    }
+
+                    for (x,y) in cb.iter().zip(cv.iter_mut()){
+                        *y=*x;
+                    }
+
+
+                }
+                else{
+                    let av = a.slice(s![ibeg..iend,kbeg..kend]);
+                    let bv = b.slice(s![kbeg..kend,jbeg..jend]);
+                    let mut cv = c.slice_mut(s![ibeg..iend,jbeg..jend]);
+                    for i in 0..iend-ibeg{
+                        for j in 0..jend-jbeg{
+                            for k in 0..kend-kbeg{
+                                cv[[i,j]] += av[[i,k]] * bv[[k,j]];
+                            }
+                        }
+                    }
                 }
             }
         }
