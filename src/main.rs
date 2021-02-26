@@ -11,6 +11,40 @@ fn gemm_base(a : ArrayView2<f64>,b : ArrayView2<f64>,mut c : ArrayViewMut2<f64>)
     assert_eq!(a.shape()[1],b.shape()[0]);
     assert_eq!(a.shape()[0],c.shape()[0]);
     assert_eq!(b.shape()[1],c.shape()[1]);
+
+    const BI : usize=8;
+    const BJ : usize=256;
+    const BK : usize=8;
+    let m=a.shape()[0];
+    let p=a.shape()[1];
+    let n=b.shape()[1];
+
+
+    for bi in (0..m).step_by(BI){
+        for bj in (0..n).step_by(BJ){
+            for bk in (0..p).step_by(BK){
+                let ibeg=bi;
+                let jbeg=bj;
+                let kbeg=bk;
+                let iend=std::cmp::min(m,ibeg+BI);
+                let jend=std::cmp::min(n,jbeg+BJ);
+                let kend=std::cmp::min(p,kbeg+BK);
+                let mut cb = c.slice_mut(s![ibeg..iend,jbeg..jend]);
+                let ab = a.slice(s![ibeg..iend,kbeg..kend]);
+                let bb = b.slice(s![kbeg..kend,jbeg..jend]);
+                for (mut ci,ai) in cb.genrows_mut().into_iter().zip(ab.genrows().into_iter()){
+                    for (bk,aik) in bb.genrows().into_iter().zip(ai.iter()){
+                        Zip::from(&mut ci).and(&bk).apply(
+                            |x,y|{
+                                *x += (*y)*aik;
+                            }
+                        );
+                    }
+                }
+            }
+        }
+    }
+    /*
     for (mut ci,ai) in c.genrows_mut().into_iter().zip(a.genrows().into_iter()){
         for (bk,aik) in b.genrows().into_iter().zip(ai.iter()){
             Zip::from(&mut ci).and(&bk).apply(
@@ -20,6 +54,7 @@ fn gemm_base(a : ArrayView2<f64>,b : ArrayView2<f64>,mut c : ArrayViewMut2<f64>)
             );
         }
     }
+    */
 }
 
 fn gemm_optimized(a : ArrayView2<f64>,b : ArrayView2<f64>,mut c : ArrayViewMut2<f64>) -> () {
